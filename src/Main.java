@@ -12,18 +12,19 @@ public class Main {
 	private static final int MAX_DISTRICT_SIZE = 650000;
 	private static final int MIN_DISTRICT_SIZE = 550000;
 	
-	private static int democratVoteTarget = 0;
+	private static int democratVoteTarget = 10;
 	
+	private static int republicanVotes = 0;
 	private static County[] counties;
 	private static int[] districtSizes;
 	private static LinkedHashSet<County> unusedCounties;
 	private static LinkedHashSet<County>[] districts;
 	private static PrintWriter writer;
-	private static int max = -1;
 	private static int[] districtMargins = new int[DISTRICT_COUNT];
 	private static double startTime;
-	
 	private static long numberOfCountiesSelected = 0;
+	private static HashSet<LinkedHashSet<County>>[] attemptedDistricts = new HashSet[DISTRICT_COUNT];
+	
 	public static void main(String[] args) {
 
 		if (args.length < 1) {
@@ -97,6 +98,14 @@ public class Main {
 		
 		districtSizes = new int[DISTRICT_COUNT];
 		
+		for (int i = 0; i < attemptedDistricts.length; i++) {
+			attemptedDistricts[i] = new HashSet<LinkedHashSet<County>>();
+			for (int j = 0; j < attemptedDistricts[i].size(); j++) {
+				attemptedDistricts[i].add(new LinkedHashSet<County>(numCounties, 1));
+			}
+		}
+		
+		
 		// Manually choose districts
 		
 		
@@ -127,7 +136,7 @@ public class Main {
 		districts[1].add(counties[1]);
 		districts[1].add(counties[8]);
 		districts[1].add(counties[15]);
-		
+		/*
 		unusedCounties.remove(counties[3]);
 		unusedCounties.remove(counties[4]);
 		unusedCounties.remove(counties[5]);
@@ -144,51 +153,34 @@ public class Main {
 		districts[2].add(counties[17]);
 		districts[2].add(counties[18]);
 		districts[2].add(counties[27]);
-
-		unusedCounties.remove(counties[6]);
-		districts[3].add(counties[6]);
+*/
+		unusedCounties.remove(counties[3]);
+		districts[2].add(counties[3]);
 		
 		Timer timer = new Timer(1, -1, new Main(), "printProgress");
 		
 		timer.start();
 		startTime = Timer.getTime();
-		System.out.println(gerrymander(counties[6], 3));
+		System.out.println(gerrymander(counties[3], 2));
 		timer.stop();
 		System.out.println(arrayString(districts));
 		writer.close();
 	}
+	
+	
+	
+	
+	
+	
 	private static int gerrymander(County current, int currentDistrict) {
 		
 		numberOfCountiesSelected++;
 		
 		if (unusedCounties.size() == 0) {
-			//System.out.println("Found possibility");
-			/*
-			for (int i = 0; i < districts.length; i++) {
-				if (districtSizes[i] > MAX_DISTRICT_SIZE || districtSizes[i] < MIN_DISTRICT_SIZE) {
-					//System.out.println("District " + i + " out of range with size " + districtSizes[i]);
-					return -1;
-				}
-			}
-			*/
-			//System.out.println("\tAll districts correct size");
-			/*
-			for (int i = 0; i < districts.length; i++) {
-				for (County c : districts[i]) {
-					boolean isAdjacent = false;
-					for (int adjacentIndex : c.adjacentCounties) {
-						isAdjacent = isAdjacent || districts[i].contains(counties[adjacentIndex]);
-					}
-					if (!isAdjacent) {
-						System.out.println("Non adjacent counties in district " + arrayString(districts));
-						return -1;
-					}
-				}
-			}
-			*/
+			
 			//System.out.println(arrayString(districts));
 
-			if (districtSizes[DISTRICT_COUNT - 1] < MIN_DISTRICT_SIZE) {
+			if (districtSizes[DISTRICT_COUNT - 1] < MIN_DISTRICT_SIZE || (districtMargins[currentDistrict] <= 0 && republicanVotes >= DISTRICT_COUNT - democratVoteTarget)) {
 				return -1;
 			}
 			
@@ -204,17 +196,22 @@ public class Main {
 					democratWins++;
 				}
 			}
-			if (democratWins > democratVoteTarget) {
-				democratVoteTarget = democratWins;
-				System.out.println(democratWins + "\n" + arrayString(districts));
-				writeln(democratWins + "\n" + arrayString(districts));
-			}
+			//if (democratWins > democratVoteTarget) {
+				//democratVoteTarget = democratWins;
+				//System.out.println(democratWins + "\n" + arrayString(districts));
+				//writeln(democratWins + "\n" + arrayString(districts));
+			//}
 			return democratWins;
 			//return republicanWins;
 		}
 		//System.out.println(arrayString(districts));
 
-		if (districtSizes[currentDistrict] > MIN_DISTRICT_SIZE && currentDistrict < DISTRICT_COUNT - 1 && districtMargins[currentDistrict] > 0) {
+		
+		
+		if (districtSizes[currentDistrict] > MIN_DISTRICT_SIZE && currentDistrict < DISTRICT_COUNT - 1 && (districtMargins[currentDistrict] > 0 || republicanVotes < DISTRICT_COUNT - democratVoteTarget) && !attemptedDistricts[currentDistrict].contains(districts[currentDistrict])) {
+			
+			attemptedDistricts[currentDistrict].add(new LinkedHashSet<County>(districts[currentDistrict]));
+			
 			County firstUnusedCounty = null;
 			for (County c : unusedCounties) {
 				firstUnusedCounty = c;
@@ -224,6 +221,10 @@ public class Main {
 			districts[currentDistrict + 1].add(firstUnusedCounty);
 			districtMargins[currentDistrict + 1] += firstUnusedCounty.democratCount - firstUnusedCounty.republicanCount;
 			districtSizes[currentDistrict + 1] += firstUnusedCounty.totalPopulation;
+			boolean isRepublicanVote = districtMargins[currentDistrict] <= 0;
+			if (isRepublicanVote) {
+				republicanVotes++;
+			}
 			int result = gerrymander(firstUnusedCounty, currentDistrict + 1);
 			if (result >= democratVoteTarget) {
 				return result;
@@ -233,6 +234,9 @@ public class Main {
 				districts[currentDistrict + 1].remove(firstUnusedCounty);
 				districtMargins[currentDistrict + 1] -= firstUnusedCounty.democratCount - firstUnusedCounty.republicanCount;
 				districtSizes[currentDistrict + 1] -= firstUnusedCounty.totalPopulation;
+				if (isRepublicanVote) {
+					republicanVotes--;
+				}
 			}
 		}
 		//System.out.println(arrayString(districts));
@@ -254,15 +258,16 @@ public class Main {
 				else {
 					unusedCounties.add(c);
 					districts[currentDistrict].remove(c);
-					System.gc();
 					districtMargins[currentDistrict] -= c.democratCount - c.republicanCount;
 					districtSizes[currentDistrict] -= c.totalPopulation;
 				}
 			}
 		}
 		
+		attemptedDistricts[currentDistrict].clear();
+		System.gc();
 		return -1;
-			
+		
 	}
 	
 	private static String arrayString(Object[] s) {
@@ -294,7 +299,7 @@ public class Main {
 }
 
 
-class County implements Comparable {
+class County implements Comparable<County> {
 	public String name;
 	public int totalPopulation;
 	public int democratCount;
@@ -307,10 +312,9 @@ class County implements Comparable {
 		return name;
 	}
 
-	public int compareTo(Object arg0) {
-		County c = (County) arg0;
+	public int compareTo(County c) {
 		int a = targetSortMargin - margin;
-		int b = targetSortMargin - ((County)arg0).margin;
-		return a + b;
+		int b = targetSortMargin - c.margin;
+		return b - a;
 	}
 }
