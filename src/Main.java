@@ -12,9 +12,11 @@ public class Main {
 	private static final int MAX_DISTRICT_SIZE = 650000;
 	private static final int MIN_DISTRICT_SIZE = 550000;
 	
-	private static int democratVoteTarget = 10;
+	// -1 for republican, 1 for democrat
+	public static int party = 1;
+	private static int voteTarget = 0;
 	
-	private static int republicanVotes = 0;
+	private static int incorrectVoteCount = 0;
 	private static County[] counties;
 	private static int[] districtSizes;
 	private static LinkedHashSet<County> unusedCounties;
@@ -107,7 +109,7 @@ public class Main {
 		
 		
 		// Manually choose districts
-		
+		/*
 		
 		unusedCounties.remove(counties[11]);
 		unusedCounties.remove(counties[10]);
@@ -115,7 +117,7 @@ public class Main {
 		unusedCounties.remove(counties[21]);
 		unusedCounties.remove(counties[22]);
 		districtSizes[0] = 600000;
-		districtMargins[0] = 11600;
+		districtMargins[0] = 11600 * party;
 		districts[0].add(counties[11]);
 		districts[0].add(counties[10]);
 		districts[0].add(counties[12]);
@@ -129,14 +131,14 @@ public class Main {
 		unusedCounties.remove(counties[8]);
 		unusedCounties.remove(counties[15]);
 		districtSizes[1] = 605000;
-		districtMargins[1] = 20600;
+		districtMargins[1] = 20600 * party;
 		districts[1].add(counties[9]);
 		districts[1].add(counties[2]);
 		districts[1].add(counties[0]);
 		districts[1].add(counties[1]);
 		districts[1].add(counties[8]);
 		districts[1].add(counties[15]);
-		/*
+		
 		unusedCounties.remove(counties[3]);
 		unusedCounties.remove(counties[4]);
 		unusedCounties.remove(counties[5]);
@@ -145,7 +147,7 @@ public class Main {
 		unusedCounties.remove(counties[18]);
 		unusedCounties.remove(counties[27]);
 		districtSizes[2] = 595000;
-		districtMargins[2] = 18600;
+		districtMargins[2] = 18600 * party;
 		districts[2].add(counties[3]);
 		districts[2].add(counties[4]);
 		districts[2].add(counties[5]);
@@ -153,16 +155,29 @@ public class Main {
 		districts[2].add(counties[17]);
 		districts[2].add(counties[18]);
 		districts[2].add(counties[27]);
-*/
-		unusedCounties.remove(counties[3]);
-		districts[2].add(counties[3]);
+		 */
 		
 		Timer timer = new Timer(1, -1, new Main(), "printProgress");
 		
 		timer.start();
 		startTime = Timer.getTime();
-		System.out.println(gerrymander(counties[3], 2));
+		System.out.println(gerrymander(counties[0], 0));
 		timer.stop();
+		
+		int partyWins = 0;
+		for (int i = 0; i < districts.length; i++) {
+			int totalRepublicans = 0;
+			int totalDemocrats = 0;
+			for (County c : districts[i]) {
+				totalDemocrats += c.democratCount;
+				totalRepublicans += c.republicanCount;
+			}
+			if ((party == 1 && totalRepublicans < totalDemocrats) || (party == -1 && totalRepublicans > totalDemocrats)) {
+				partyWins++;
+			}
+		}
+		System.out.println(partyWins);
+		
 		System.out.println(arrayString(districts));
 		writer.close();
 	}
@@ -172,43 +187,43 @@ public class Main {
 	
 	
 	
-	private static int gerrymander(County current, int currentDistrict) {
+	private static boolean gerrymander(County current, int currentDistrict) {
 		
 		numberOfCountiesSelected++;
+		
+		unusedCounties.remove(current);
+		districts[currentDistrict].add(current);
+		districtMargins[currentDistrict] += current.democratCount - current.republicanCount;
+		districtSizes[currentDistrict] += current.totalPopulation;
 		
 		if (unusedCounties.size() == 0) {
 			
 			//System.out.println(arrayString(districts));
 
-			if (districtSizes[DISTRICT_COUNT - 1] < MIN_DISTRICT_SIZE || (districtMargins[currentDistrict] <= 0 && republicanVotes >= DISTRICT_COUNT - democratVoteTarget)) {
-				return -1;
+			/*
+			if (democratWins > democratVoteTarget) {
+				democratVoteTarget = democratWins;
+				System.out.println(democratWins + "\n" + arrayString(districts));
+				writeln(democratWins + "\n" + arrayString(districts));
 			}
+			 */
 			
-			int democratWins = 0;
-			for (int i = 0; i < districts.length; i++) {
-				int totalRepublicans = 0;
-				int totalDemocrats = 0;
-				for (County c : districts[i]) {
-					totalDemocrats += c.democratCount;
-					totalRepublicans += c.republicanCount;
-				}
-				if (totalRepublicans < totalDemocrats) {
-					democratWins++;
-				}
+			if (districtSizes[DISTRICT_COUNT - 1] < MIN_DISTRICT_SIZE || (districtMargins[currentDistrict] * party <= 0 && incorrectVoteCount >= DISTRICT_COUNT - voteTarget)) {
+				return true;
 			}
-			//if (democratWins > democratVoteTarget) {
-				//democratVoteTarget = democratWins;
-				//System.out.println(democratWins + "\n" + arrayString(districts));
-				//writeln(democratWins + "\n" + arrayString(districts));
-			//}
-			return democratWins;
-			//return republicanWins;
+			else {
+				unusedCounties.add(current);
+				districts[currentDistrict].remove(current);
+				districtMargins[currentDistrict] -= current.democratCount - current.republicanCount;
+				districtSizes[currentDistrict] -= current.totalPopulation;
+				return false;
+			}
 		}
+		
+		
 		//System.out.println(arrayString(districts));
-
 		
-		
-		if (districtSizes[currentDistrict] > MIN_DISTRICT_SIZE && currentDistrict < DISTRICT_COUNT - 1 && (districtMargins[currentDistrict] > 0 || republicanVotes < DISTRICT_COUNT - democratVoteTarget) && !attemptedDistricts[currentDistrict].contains(districts[currentDistrict])) {
+		if (districtSizes[currentDistrict] > MIN_DISTRICT_SIZE && currentDistrict < DISTRICT_COUNT - 1 && (districtMargins[currentDistrict] * party > 0 || incorrectVoteCount < DISTRICT_COUNT - voteTarget) && !attemptedDistricts[currentDistrict].contains(districts[currentDistrict])) {
 			
 			attemptedDistricts[currentDistrict].add(new LinkedHashSet<County>(districts[currentDistrict]));
 			
@@ -217,57 +232,44 @@ public class Main {
 				firstUnusedCounty = c;
 				break;
 			}
-			unusedCounties.remove(firstUnusedCounty);
-			districts[currentDistrict + 1].add(firstUnusedCounty);
-			districtMargins[currentDistrict + 1] += firstUnusedCounty.democratCount - firstUnusedCounty.republicanCount;
-			districtSizes[currentDistrict + 1] += firstUnusedCounty.totalPopulation;
-			boolean isRepublicanVote = districtMargins[currentDistrict] <= 0;
-			if (isRepublicanVote) {
-				republicanVotes++;
+			boolean isIncorrectVote = districtMargins[currentDistrict] * party <= 0;
+			if (isIncorrectVote) {
+				incorrectVoteCount++;
 			}
-			int result = gerrymander(firstUnusedCounty, currentDistrict + 1);
-			if (result >= democratVoteTarget) {
-				return result;
+			if (gerrymander(firstUnusedCounty, currentDistrict + 1)) {
+				return true;
 			}
 			else {
-				unusedCounties.add(firstUnusedCounty);
-				districts[currentDistrict + 1].remove(firstUnusedCounty);
-				districtMargins[currentDistrict + 1] -= firstUnusedCounty.democratCount - firstUnusedCounty.republicanCount;
-				districtSizes[currentDistrict + 1] -= firstUnusedCounty.totalPopulation;
-				if (isRepublicanVote) {
-					republicanVotes--;
+				attemptedDistricts[currentDistrict + 1].clear();
+				System.gc();
+
+				if (isIncorrectVote) {
+					incorrectVoteCount--;
 				}
 			}
 		}
+		
+		
+		
 		//System.out.println(arrayString(districts));
-		County.targetSortMargin = -districtMargins[currentDistrict];
+		County.targetSortMargin = -districtMargins[currentDistrict] * party;
 		Arrays.sort(current.adjacentCounties);
 		
 		for (County c : current.adjacentCounties) {
 
 			if (unusedCounties.contains(c) && districtSizes[currentDistrict] + c.totalPopulation <= MAX_DISTRICT_SIZE) {
-			
-				unusedCounties.remove(c);
-				districts[currentDistrict].add(c);
-				districtMargins[currentDistrict] += c.democratCount - c.republicanCount;
-				districtSizes[currentDistrict] += c.totalPopulation;
-				int result = gerrymander(c, currentDistrict);
-				if (result >= democratVoteTarget) {
-					return result;
-				}
-				else {
-					unusedCounties.add(c);
-					districts[currentDistrict].remove(c);
-					districtMargins[currentDistrict] -= c.democratCount - c.republicanCount;
-					districtSizes[currentDistrict] -= c.totalPopulation;
+				
+				if (gerrymander(c, currentDistrict)) {
+					return true;
 				}
 			}
 		}
 		
-		attemptedDistricts[currentDistrict].clear();
-		System.gc();
-		return -1;
-		
+		unusedCounties.add(current);
+		districts[currentDistrict].remove(current);
+		districtMargins[currentDistrict] -= current.democratCount - current.republicanCount;
+		districtSizes[currentDistrict] -= current.totalPopulation;
+		return false;
 	}
 	
 	private static String arrayString(Object[] s) {
@@ -293,6 +295,7 @@ public class Main {
 		writer.println(s);
 		writer.flush();
 	}
+	
 	public void printProgress() {
 		System.out.printf("County selections attempted: " + numberOfCountiesSelected + "\tTime elapsed: %.3f" + "\t" + arrayString(districts) + '\n', Timer.getTime() - startTime);
 	}
